@@ -1,0 +1,997 @@
+<!DOCTYPE html>
+<html lang="es">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0">
+
+<title>Tetris</title>
+
+<style>
+* {
+    box-sizing: border-box;
+}
+
+body {
+    margin: 0;
+    background: linear-gradient(135deg, #111827, #312e81);
+    color: white;
+    font-family: Arial, sans-serif;
+
+    min-height: 100vh;
+
+    display: flex;
+    justify-content: center;
+    align-items: center;
+}
+
+.contenedor {
+    display: flex;
+    gap: 25px;
+    align-items: flex-start;
+}
+
+canvas {
+    background: #050505;
+    border: 5px solid #6366f1;
+    border-radius: 8px;
+
+    box-shadow:
+        0 0 20px #6366f1,
+        0 0 50px rgba(99,102,241,.3);
+}
+
+.panel {
+    background: rgba(17,24,39,.95);
+    padding: 20px;
+    width: 220px;
+    border-radius: 15px;
+
+    box-shadow: 0 0 20px rgba(0,0,0,.5);
+}
+
+h1 {
+    text-align: center;
+    color: #22d3ee;
+    margin-top: 0;
+}
+
+.info {
+    text-align: center;
+    font-size: 18px;
+    margin: 12px;
+}
+
+.numero {
+    color: #facc15;
+    font-size: 25px;
+    font-weight: bold;
+}
+
+button {
+    width: 100%;
+    padding: 12px;
+    margin-top: 10px;
+
+    border: none;
+    border-radius: 8px;
+
+    background: #22d3ee;
+    color: #111827;
+
+    font-weight: bold;
+    font-size: 15px;
+
+    cursor: pointer;
+}
+
+button:hover {
+    background: #67e8f9;
+}
+
+.controles {
+    margin-top: 20px;
+    padding: 12px;
+
+    background: #111827;
+    border-radius: 10px;
+
+    font-size: 13px;
+    line-height: 1.8;
+}
+
+.controles strong {
+    color: #22d3ee;
+}
+
+@media (max-width: 650px) {
+
+    body {
+        align-items: flex-start;
+        padding-top: 20px;
+    }
+
+    .contenedor {
+        transform: scale(.8);
+        transform-origin: top center;
+    }
+}
+</style>
+</head>
+
+<body>
+
+<div class="contenedor">
+
+    <!-- TABLERO -->
+    <canvas id="tetris" width="300" height="600"></canvas>
+
+    <!-- PANEL -->
+    <div class="panel">
+
+        <h1>🎮 TETRIS</h1>
+
+        <div class="info">
+            PUNTOS
+            <div class="numero" id="score">0</div>
+        </div>
+
+        <div class="info">
+            LÍNEAS
+            <div class="numero" id="lines">0</div>
+        </div>
+
+        <div class="info">
+            NIVEL
+            <div class="numero" id="level">1</div>
+        </div>
+
+        <button onclick="reiniciar()">
+            🔄 REINICIAR
+        </button>
+
+        <div class="controles">
+
+            <strong>CONTROLES</strong>
+            <br><br>
+
+            ⬅️ Flecha izquierda<br>
+            ➡️ Flecha derecha<br>
+            ⬇️ Flecha abajo<br>
+            ⬆️ Flecha arriba = Girar<br><br>
+
+            <strong>A</strong> = Izquierda<br>
+            <strong>D</strong> = Derecha<br>
+            <strong>S</strong> = Bajar<br>
+            <strong>W</strong> = Girar<br><br>
+
+            <strong>Z</strong> = Girar ↺<br>
+            <strong>X</strong> = Girar ↻<br><br>
+
+            <strong>ESPACIO</strong> = Caída rápida<br>
+            <strong>P</strong> = Pausa
+
+        </div>
+
+    </div>
+
+</div>
+
+<script>
+
+const canvas = document.getElementById("tetris");
+const ctx = canvas.getContext("2d");
+
+const COLUMNAS = 10;
+const FILAS = 20;
+const TAMANO = 30;
+
+ctx.scale(TAMANO, TAMANO);
+
+
+/* =========================
+   COLORES
+========================= */
+
+const colores = [
+    null,
+    "#00ffff",
+    "#0000ff",
+    "#ff8800",
+    "#ffff00",
+    "#00ff00",
+    "#aa00ff",
+    "#ff0000"
+];
+
+
+/* =========================
+   PIEZAS
+========================= */
+
+const piezas = [
+
+    // I
+    [
+        [1,1,1,1]
+    ],
+
+    // J
+    [
+        [2,0,0],
+        [2,2,2]
+    ],
+
+    // L
+    [
+        [0,0,3],
+        [3,3,3]
+    ],
+
+    // O
+    [
+        [4,4],
+        [4,4]
+    ],
+
+    // S
+    [
+        [0,5,5],
+        [5,5,0]
+    ],
+
+    // T
+    [
+        [0,6,0],
+        [6,6,6]
+    ],
+
+    // Z
+    [
+        [7,7,0],
+        [0,7,7]
+    ]
+];
+
+
+/* =========================
+   VARIABLES
+========================= */
+
+let tablero;
+
+let jugador;
+
+let puntos = 0;
+
+let lineas = 0;
+
+let nivel = 1;
+
+let gameOver = false;
+
+let pausa = false;
+
+let tiempoCaida = 0;
+
+let ultimaHora = 0;
+
+let velocidad = 800;
+
+
+/* =========================
+   CREAR TABLERO
+========================= */
+
+function crearTablero() {
+
+    return Array.from(
+        { length: FILAS },
+        () => Array(COLUMNAS).fill(0)
+    );
+}
+
+
+/* =========================
+   CREAR PIEZA
+========================= */
+
+function crearPieza() {
+
+    const forma =
+        piezas[
+            Math.floor(Math.random() * piezas.length)
+        ];
+
+    return {
+
+        matriz: forma.map(fila => [...fila]),
+
+        posicion: {
+
+            x:
+                Math.floor(COLUMNAS / 2) -
+                Math.floor(forma[0].length / 2),
+
+            y: 0
+        }
+    };
+}
+
+
+/* =========================
+   DIBUJAR
+========================= */
+
+function dibujarMatriz(matriz, posicion) {
+
+    matriz.forEach((fila, y) => {
+
+        fila.forEach((valor, x) => {
+
+            if (valor) {
+
+                ctx.fillStyle = colores[valor];
+
+                ctx.fillRect(
+                    x + posicion.x,
+                    y + posicion.y,
+                    1,
+                    1
+                );
+
+                ctx.strokeStyle = "#111";
+
+                ctx.lineWidth = 0.05;
+
+                ctx.strokeRect(
+                    x + posicion.x,
+                    y + posicion.y,
+                    1,
+                    1
+                );
+            }
+
+        });
+
+    });
+}
+
+
+/* =========================
+   DIBUJAR JUEGO
+========================= */
+
+function dibujar() {
+
+    ctx.fillStyle = "#050505";
+
+    ctx.fillRect(
+        0,
+        0,
+        COLUMNAS,
+        FILAS
+    );
+
+    dibujarMatriz(
+        tablero,
+        {x:0, y:0}
+    );
+
+    dibujarMatriz(
+        jugador.matriz,
+        jugador.posicion
+    );
+
+
+    /* PAUSA */
+
+    if (pausa) {
+
+        ctx.fillStyle =
+            "rgba(0,0,0,.75)";
+
+        ctx.fillRect(
+            0,
+            0,
+            COLUMNAS,
+            FILAS
+        );
+
+        ctx.fillStyle = "white";
+
+        ctx.font = "1px Arial";
+
+        ctx.textAlign = "center";
+
+        ctx.fillText(
+            "PAUSA",
+            COLUMNAS / 2,
+            FILAS / 2
+        );
+    }
+
+
+    /* GAME OVER */
+
+    if (gameOver) {
+
+        ctx.fillStyle =
+            "rgba(0,0,0,.8)";
+
+        ctx.fillRect(
+            0,
+            0,
+            COLUMNAS,
+            FILAS
+        );
+
+        ctx.fillStyle = "#ff3333";
+
+        ctx.font = "1px Arial";
+
+        ctx.textAlign = "center";
+
+        ctx.fillText(
+            "GAME OVER",
+            COLUMNAS / 2,
+            9
+        );
+
+        ctx.fillStyle = "white";
+
+        ctx.font = ".5px Arial";
+
+        ctx.fillText(
+            "Pulsa REINICIAR",
+            COLUMNAS / 2,
+            11
+        );
+    }
+}
+
+
+/* =========================
+   COLISIONES
+========================= */
+
+function colisiona(tablero, jugador) {
+
+    const matriz = jugador.matriz;
+
+    const posicion = jugador.posicion;
+
+    for (
+        let y = 0;
+        y < matriz.length;
+        y++
+    ) {
+
+        for (
+            let x = 0;
+            x < matriz[y].length;
+            x++
+        ) {
+
+            if (
+                matriz[y][x] !== 0 &&
+
+                (
+                    tablero[
+                        y + posicion.y
+                    ] === undefined ||
+
+                    tablero[
+                        y + posicion.y
+                    ][
+                        x + posicion.x
+                    ] === undefined ||
+
+                    tablero[
+                        y + posicion.y
+                    ][
+                        x + posicion.x
+                    ] !== 0
+                )
+            ) {
+
+                return true;
+            }
+        }
+    }
+
+    return false;
+}
+
+
+/* =========================
+   UNIR PIEZA
+========================= */
+
+function unir(tablero, jugador) {
+
+    jugador.matriz.forEach(
+        (fila, y) => {
+
+            fila.forEach(
+                (valor, x) => {
+
+                    if (valor) {
+
+                        tablero[
+                            y + jugador.posicion.y
+                        ][
+                            x + jugador.posicion.x
+                        ] = valor;
+                    }
+
+                }
+            );
+
+        }
+    );
+}
+
+
+/* =========================
+   GIRAR PIEZA
+========================= */
+
+function girar(matriz, direccion) {
+
+    for (
+        let y = 0;
+        y < matriz.length;
+        y++
+    ) {
+
+        for (
+            let x = 0;
+            x < y;
+            x++
+        ) {
+
+            [
+                matriz[x][y],
+                matriz[y][x]
+
+            ] = [
+
+                matriz[y][x],
+                matriz[x][y]
+            ];
+        }
+    }
+
+
+    if (direccion > 0) {
+
+        matriz.forEach(
+            fila => fila.reverse()
+        );
+
+    } else {
+
+        matriz.reverse();
+    }
+}
+
+
+/* =========================
+   GIRAR JUGADOR
+========================= */
+
+function jugadorGirar(direccion) {
+
+    if (gameOver || pausa)
+        return;
+
+    const posicionAnterior =
+        jugador.posicion.x;
+
+    let desplazamiento = 1;
+
+    girar(
+        jugador.matriz,
+        direccion
+    );
+
+
+    while (
+        colisiona(tablero, jugador)
+    ) {
+
+        jugador.posicion.x +=
+            desplazamiento;
+
+        desplazamiento =
+            -(desplazamiento +
+            (desplazamiento > 0 ? 1 : -1));
+
+
+        if (
+            desplazamiento >
+            jugador.matriz[0].length
+        ) {
+
+            girar(
+                jugador.matriz,
+                -direccion
+            );
+
+            jugador.posicion.x =
+                posicionAnterior;
+
+            return;
+        }
+    }
+}
+
+
+/* =========================
+   MOVER
+========================= */
+
+function moverJugador(direccion) {
+
+    if (gameOver || pausa)
+        return;
+
+    jugador.posicion.x += direccion;
+
+    if (
+        colisiona(tablero, jugador)
+    ) {
+
+        jugador.posicion.x -= direccion;
+    }
+}
+
+
+/* =========================
+   BAJAR
+========================= */
+
+function bajarJugador() {
+
+    if (gameOver || pausa)
+        return;
+
+    jugador.posicion.y++;
+
+
+    if (
+        colisiona(tablero, jugador)
+    ) {
+
+        jugador.posicion.y--;
+
+        unir(tablero, jugador);
+
+        eliminarLineas();
+
+        jugador = crearPieza();
+
+
+        if (
+            colisiona(tablero, jugador)
+        ) {
+
+            gameOver = true;
+        }
+    }
+
+    tiempoCaida = 0;
+}
+
+
+/* =========================
+   CAÍDA RÁPIDA
+========================= */
+
+function caidaRapida() {
+
+    if (gameOver || pausa)
+        return;
+
+
+    while (
+        !colisiona(tablero, jugador)
+    ) {
+
+        jugador.posicion.y++;
+    }
+
+
+    jugador.posicion.y--;
+
+    unir(tablero, jugador);
+
+    eliminarLineas();
+
+    jugador = crearPieza();
+
+
+    if (
+        colisiona(tablero, jugador)
+    ) {
+
+        gameOver = true;
+    }
+
+    tiempoCaida = 0;
+}
+
+
+/* =========================
+   ELIMINAR LÍNEAS
+========================= */
+
+function eliminarLineas() {
+
+    let cantidad = 0;
+
+
+    for (
+        let y = FILAS - 1;
+        y >= 0;
+        y--
+    ) {
+
+        let completa = true;
+
+
+        for (
+            let x = 0;
+            x < COLUMNAS;
+            x++
+        ) {
+
+            if (
+                tablero[y][x] === 0
+            ) {
+
+                completa = false;
+
+                break;
+            }
+        }
+
+
+        if (completa) {
+
+            tablero.splice(y, 1);
+
+            tablero.unshift(
+                Array(COLUMNAS).fill(0)
+            );
+
+            y++;
+
+            cantidad++;
+        }
+    }
+
+
+    if (cantidad > 0) {
+
+        const puntosLinea =
+            [0,100,300,500,800];
+
+        puntos +=
+            puntosLinea[cantidad] * nivel;
+
+        lineas += cantidad;
+
+        nivel =
+            Math.floor(lineas / 10) + 1;
+
+        velocidad =
+            Math.max(
+                100,
+                800 - (nivel - 1) * 70
+            );
+
+        actualizarDatos();
+    }
+}
+
+
+/* =========================
+   ACTUALIZAR INFORMACIÓN
+========================= */
+
+function actualizarDatos() {
+
+    document.getElementById(
+        "score"
+    ).textContent = puntos;
+
+    document.getElementById(
+        "lines"
+    ).textContent = lineas;
+
+    document.getElementById(
+        "level"
+    ).textContent = nivel;
+}
+
+
+/* =========================
+   BUCLE DEL JUEGO
+========================= */
+
+function actualizar(hora = 0) {
+
+    const diferencia =
+        hora - ultimaHora;
+
+    ultimaHora = hora;
+
+
+    if (
+        !pausa &&
+        !gameOver
+    ) {
+
+        tiempoCaida += diferencia;
+
+
+        if (
+            tiempoCaida > velocidad
+        ) {
+
+            bajarJugador();
+        }
+    }
+
+
+    dibujar();
+
+    requestAnimationFrame(
+        actualizar
+    );
+}
+
+
+/* =========================
+   REINICIAR
+========================= */
+
+function reiniciar() {
+
+    tablero = crearTablero();
+
+    jugador = crearPieza();
+
+    puntos = 0;
+
+    lineas = 0;
+
+    nivel = 1;
+
+    velocidad = 800;
+
+    tiempoCaida = 0;
+
+    gameOver = false;
+
+    pausa = false;
+
+    actualizarDatos();
+}
+
+
+/* =========================
+   TECLAS
+========================= */
+
+document.addEventListener(
+    "keydown",
+    function(event) {
+
+        const tecla =
+            event.key.toLowerCase();
+
+
+        /* IZQUIERDA */
+
+        if (
+            event.key === "ArrowLeft" ||
+            tecla === "a"
+        ) {
+
+            event.preventDefault();
+
+            moverJugador(-1);
+        }
+
+
+        /* DERECHA */
+
+        else if (
+            event.key === "ArrowRight" ||
+            tecla === "d"
+        ) {
+
+            event.preventDefault();
+
+            moverJugador(1);
+        }
+
+
+        /* BAJAR */
+
+        else if (
+            event.key === "ArrowDown" ||
+            tecla === "s"
+        ) {
+
+            event.preventDefault();
+
+            bajarJugador();
+        }
+
+
+        /* GIRAR DERECHA */
+
+        else if (
+            event.key === "ArrowUp" ||
+            tecla === "w" ||
+            tecla === "x"
+        ) {
+
+            event.preventDefault();
+
+            jugadorGirar(1);
+        }
+
+
+        /* GIRAR IZQUIERDA */
+
+        else if (
+            tecla === "z"
+        ) {
+
+            event.preventDefault();
+
+            jugadorGirar(-1);
+        }
+
+
+        /* CAÍDA RÁPIDA */
+
+        else if (
+            event.code === "Space"
+        ) {
+
+            event.preventDefault();
+
+            caidaRapida();
+        }
+
+
+        /* PAUSA */
+
+        else if (
+            tecla === "p"
+        ) {
+
+            pausa = !pausa;
+        }
+
+    }
+);
+
+
+/* =========================
+   INICIAR
+========================= */
+
+reiniciar();
+
+actualizar();
+
+</script>
+
+</body>
+</html>
